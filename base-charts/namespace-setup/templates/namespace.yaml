@@ -1,0 +1,15 @@
+# Here, we use a Helm range loop. This is an advanced technique. If you pass a list of 5 namespaces in your values file, 
+# this loop will generate 5 Kubernetes namespaces automatically! -  this is opetional we can remove if we dont want !!!
+
+{{- range .Values.namespaces}}
+apiVersion: v1
+kind: Namespace 
+metadata:
+  name: {{ .name }}
+  labels:
+    environement: {{ $.Values.environment }}
+    managed-by: helm-gitOps
+---
+{{- end }}
+
+

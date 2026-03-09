@@ -1,2 +1,92 @@
 
+name: 01 - Onboard Namespaces
 
+# THIS is the Albertsons Magic! It dynamically names the workflow run.
+run-name: Onboard NS | Cluster: ${{ inputs.target_cluster }} | CR: ${{ inputs.cr_number }} | By @${{ github.actor }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      cr_number:
+        description: 'Change Request (CR) Number (e.g., CR-10293)'
+        required: true
+        type: string
+      target_cluster:
+        description: 'Select the target cluster'
+        required: true
+        type: choice
+        options:
+          - aks-shared-obs
+          - aks-app-01
+          - both-clusters
+
+env:
+  RESOURCE_GROUP: "valki-ent-rg"
+
+# jobs: A workflow is made of one or more jobs.
+# deploy-namespaces: The internal ID of this specific job.
+# runs-on: ubuntu-latest: Tells GitHub to provision a fresh virtual machine running the latest version of Ubuntu Linux to execute these steps.
+
+jobs:
+  deploy-namespaces:
+    runs-on: ubuntu-latest
+
+
+# The steps section is the sequence of tasks the server will execute.
+
+    steps:
+      # 1. Pull the YAML files from Git to the Runner
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # 2. Show the ID Badge to Azure
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      
+      # 3. Connect to the Observability Cluster and Apply via Helm
+      - name: Onboard to Shared Obs Cluster
+        if: ${{ inputs.target_cluster == 'aks-shared-obs' || inputs.target_cluster == 'both-clusters' }}
+        run: |
+          echo "Connecting to aks-shared-obs..."
+          az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name aks-shared-obs --overwrite-existing
+          
+          echo "Deploying Namespaces via Helm..."
+          helm upgrade --install cluster-namespaces ./base-charts/namespace-setup -f clusters/aks-shared-obs/name-space-onboard/values.yaml
+
+      # 4. Connect to the App Cluster and Apply via Helm
+      - name: Onboard to App Cluster
+        if: ${{ inputs.target_cluster == 'aks-app-01' || inputs.target_cluster == 'both-clusters' }}
+        run: |
+          echo "Connecting to aks-app-01..."
+          az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name aks-app-01 --overwrite-existing
+          
+          echo "Deploying Namespaces via Helm..."
+          helm upgrade --install cluster-namespaces ./base-charts/namespace-setup -f clusters/aks-app-01/name-space-onboard/values.yaml      
+
+
+
+
+      # IF going with normal k8's yaml file then use this commands. NOTE- we are not using K8's manifest's , we are using HELM !!!
+      
+      # # 3. Connect to the Observability Cluster and Apply
+      # - name: Onboard to Shared Obs Cluster
+      #   if: ${{ inputs.target_cluster == 'aks-shared-obs' || inputs.target_cluster == 'both-clusters' }}
+      #   run: |
+      #     echo "Connecting to aks-shared-obs..."
+      #     az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name aks-shared-obs --overwrite-existing
+          
+      #     echo "Applying Namespace Manifests..."
+      #     kubectl apply -f clusters/aks-shared-obs/namespaces.yaml
+
+      # # 4. Connect to the App Cluster and Apply
+      # - name: Onboard to App Cluster
+      #   if: ${{ inputs.target_cluster == 'aks-app-01' || inputs.target_cluster == 'both-clusters' }}
+      #   run: |
+      #     echo "Connecting to aks-app-01..."
+      #     az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name aks-app-01 --overwrite-existing
+          
+      #     echo "Applying Namespace Manifests..."
+      #     kubectl apply -f clusters/aks-app-01/namespaces.yaml

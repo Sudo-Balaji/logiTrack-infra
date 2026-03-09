@@ -1,0 +1,6 @@
+# Default values. These will be overridden by the cluster-specific files.
+# The default empty variables
+
+environment: production
+namespaces: []
+

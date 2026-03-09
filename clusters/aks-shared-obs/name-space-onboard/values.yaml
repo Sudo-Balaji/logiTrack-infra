@@ -1,0 +1,9 @@
+# If you ever need to add a QA namespace to the app cluster later, you don't touch the template. 
+# You just add - name: logitrack-qa to this values file! That is the power of Helm.
+#
+# Render cmd - helm template test-render ./base-charts/namespace-setup -f clusters/aks-shared-01/name-space-onboard/values.yaml > ns-obs.yaml 
+
+environment: prod-shared
+namespaces: 
+  - name: obs-shared
+
