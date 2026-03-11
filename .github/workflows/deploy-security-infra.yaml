@@ -1,0 +1,40 @@
+name: 02 - Deploy Security Infra (KV Bridge)
+
+run-name: "Deploy KV Bridge | Cluster: aks-shared-obs | CR: ${{ inputs.cr_number }} | CR: ${{ inputs.cr_description }} | By @${{ github.actor }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      cr_number:
+        description: 'Change Request (CR) Number'
+        required: true
+        type: string
+
+      cr_description:
+        description: 'Notes about the change request'
+        required: true
+        type: string
+
+env:
+  RESOURCE_GROUP: "valki-ent-rg"
+
+jobs:
+  deploy-secret-bridge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Deploy SecretProviderClass via Helm
+        run: |
+          echo "Connecting to aks-shared-obs..."
+          az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name aks-shared-obs --overwrite-existing
+          
+          echo "Deploying Key Vault Bridge via Helm..."
+          helm upgrade --install akv-bridge ./base-charts/akv-secret-bridge -f clusters/aks-shared-obs/akv-secret-bridge/values.yaml
