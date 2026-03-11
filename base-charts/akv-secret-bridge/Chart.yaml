@@ -1,0 +1,5 @@
+apiVersion: v2
+name: akv-secret-bridge
+description: A Helm chart to create a SecretProviderClass for Azure Key Vault
+type: application
+version: 1.0.0
