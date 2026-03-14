@@ -1,9 +1,15 @@
 keyvaultName: "valki-kv-prod-01" # Make sure this matches your actual Key Vault name!
 tenantId: "6ba4855b-b65e-4ece-bdaf-45f226d48d9f"
 secrets:
+
   # This pulls 'grafana-admin-password' from Azure and names the K8s key 'admin-password'
   - secretName: grafana-admin-password
     k8sKey: admin-password
+
   # This pulls 'db-password' from Azure and names the K8s key 'database-password'
   - secretName: db-password
     k8sKey: database-password
+  
+  # --- NEW LOKI/TEMPO STORAGE KEY ---
+  - secretName: storage-account-key
+    k8sKey: storage-account-key
