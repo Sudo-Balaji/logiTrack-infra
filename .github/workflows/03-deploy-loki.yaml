@@ -1,0 +1,54 @@
+name: 03 - Deploy Loki Database
+
+run-name: "Deploy Loki | Cluster: aks-shared-obs | CR: ${{ inputs.cr_number }} | Description: ${{ inputs.cr_description }} | By @${{ github.actor }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      cr_number:
+        description: 'Change Request (CR) Number'
+        required: true
+        type: string
+
+      cr_description:
+        description: 'Notes about the change request'
+        required: true
+        type: string
+
+env:
+  RESOURCE_GROUP: "valki-ent-rg"
+
+jobs:
+  deploy-loki:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      # We must add the official Grafana Helm repository to the runner before we can deploy Loki, since Loki is a Grafana product and is hosted in their repo.
+
+      - name: Add Grafana Helm Repo
+        run: |
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo update
+
+
+
+      # Notice we are downloading 'grafana/loki' but injecting OUR values.yaml and config.yaml. This is the beauty of Helm - we can use any public chart and customize it with our own settings!
+
+      - name: Deploy Loki via Helm
+        run: |
+          echo "Connecting to aks-shared-obs..."
+          az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name aks-shared-obs --overwrite-existing
+
+          echo "Deploying Loki with values.yaml AND config.yaml..."
+          helm upgrade --install loki grafana/loki \
+            --namespace obs-shared \
+            -f clusters/aks-shared-obs/loki/values.yaml \
+            -f clusters/aks-shared-obs/loki/config.yaml

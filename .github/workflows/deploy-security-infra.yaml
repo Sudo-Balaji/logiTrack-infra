@@ -1,6 +1,6 @@
 name: 02 - Deploy Security Infra (KV Bridge)
 
-run-name: "Deploy KV Bridge | Cluster: aks-shared-obs | CR: ${{ inputs.cr_number }} | CR: ${{ inputs.cr_description }} | By @${{ github.actor }}"
+run-name: "Deploy KV Bridge | Cluster: aks-shared-obs | CR: ${{ inputs.cr_number }} | Description: ${{ inputs.cr_description }} | By @${{ github.actor }}"
 
 on:
   workflow_dispatch:
