@@ -33,8 +33,16 @@ jobs:
       
       - name: Deploy SecretProviderClass via Helm
         run: |
+
+          echo "--- START RENDERED HELM YAML ---"
+          # This command prints the final YAML to the GitHub Actions logs without deploying it
+          helm template akv-bridge ./base-charts/akv-secret-bridge -f clusters/aks-shared-obs/akv-secret-bridge/values.yaml
+          echo "--- END RENDERED HELM YAML ---"
+
+
           echo "Connecting to aks-shared-obs..."
           az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name aks-shared-obs --overwrite-existing
-          
+
+  
           echo "Deploying Key Vault Bridge via Helm..."
           helm upgrade --install akv-bridge ./base-charts/akv-secret-bridge -f clusters/aks-shared-obs/akv-secret-bridge/values.yaml
