@@ -50,7 +50,7 @@ loki:
 
   compactor:
     working_directory: /var/loki/compactor
-    shared_store: azure
+    #shared_store: azure
     retention_enabled: true
     
   limits_config:
