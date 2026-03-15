@@ -1,0 +1,81 @@
+# INFRASTRUCTURE SETTINGS
+# Render command to see the final YAML that will be applied to Kubernetes. This is useful for debugging and learning how Helm works.
+# helm template my-loki grafana/loki \
+#   --namespace obs-shared \
+#   -f clusters/aks-shared-obs/loki/values.yaml \
+#   -f clusters/aks-shared-obs/loki/config.yaml \
+#   > rendered-loki.yaml
+
+
+# 1. FIX: Zero out the default SimpleScalable components
+write:
+  replicas: 0
+read:
+  replicas: 0
+backend:
+  replicas: 0
+
+
+# Deploy all Loki components in 1 Pod  - It tells Kubernetes how to build the server that Loki will run on.
+# Meaning: The Grafana Helm chart has massive if/else statements inside it. 
+# This line tells Helm: "Ignore the code for 10 microservices. Use the code block that builds just ONE Pod that does everything.
+
+deploymentMode: SingleBinary
+
+
+
+
+# Configure the StatefulSet replicas and the local PVC
+# This tells Kubernetes to create a StatefulSet with exactly 1 Pod. The persistence lines tell Kubernetes to dynamically 
+# talk to Azure and provision a 5-Gigabyte Managed Disk (a PersistentVolumeClaim or PVC) and attach it to our Pod. 
+# Loki will use this tiny disk as a temporary cache.
+
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 5Gi # This creates the K8s PVC automatically!
+
+
+
+
+
+# Trigger the CSI Bridge to fetch the Azure Key
+# We are modifying the Pod's blueprint. We are telling Kubernetes to attach a "virtual hard drive" (Volume) 
+# named secrets-store-inline. But it's not a real disk; it's a connection to the csi (Container Storage Interface) driver. 
+# We specifically tell it to use the recipe we wrote in VALK-301 called azure-kv-bridge.
+
+extraVolumes:
+  - name: secrets-store-inline
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes:
+        secretProviderClass: "azure-kv-bridge"
+
+
+
+
+# Now that the virtual hard drive exists, we have to "plug it in" (mount it) to the Linux container. 
+# We mount it to the folder path /mnt/secrets-store. Crucial: This is the exact moment the "Lazy Chef" wakes up,
+# runs to Azure Key Vault, and creates our obs-shared-secrets file!
+
+extraVolumeMounts:
+  - name: secrets-store-inline
+    mountPath: "/mnt/secrets-store"
+    readOnly: true
+
+
+
+
+# Inject the Azure Key as an Environment Variable
+# We are injecting an Environment Variable into the Linux container named AZURE_STORAGE_KEY. 
+# Where does the value come from? It reads (secretKeyRef) from the K8s Secret named obs-shared-secrets 
+# and pulls the value out of the storage-account-key line.
+
+extraEnv:
+  - name: AZURE_STORAGE_KEY
+    valueFrom:
+      secretKeyRef:
+        name: obs-shared-secrets   # Secret named obs-shared-secrets
+        key: storage-account-key   # The passsord is stored under this storage-account-key name , use this in the place to ref the passwrd

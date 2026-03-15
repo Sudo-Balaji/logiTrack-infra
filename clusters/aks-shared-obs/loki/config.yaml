@@ -1,0 +1,57 @@
+# LOKI APPLICATION CONFIGURATION
+
+# WHILE VALUES.YAML TALKS TO KUBERNETES, THIS FILE TALKS TO THE LOKI SOFTWARE RUNNING INSIDE THE POD.
+
+
+# Turns off Loki's internal username/password prompt for receiving logs. Since our cluster is a private network, 
+# we trust Alloy (the delivery truck) to send logs without needing a password.
+
+loki:
+  auth_enabled: false
+  
+
+
+  # Tell Loki to use Azure Blob Storage
+
+  # We tell Loki to use Azure Blob APIs. For the account_key, Loki has a built-in feature to read Linux Environment Variables. 
+  # It sees ${AZURE_STORAGE_KEY} and dynamically replaces it with the password we injected in Step 1!
+
+  storage:
+    type: azure
+    azure:
+      account_name: valkiobsstorage2026
+      account_key: ${AZURE_STORAGE_KEY} # Loki has a built-in feature to read Linux Environment Variables ...
+    bucketNames:
+      chunks: loki-data  # Loki splits its data into different types (compressed logs = chunks, alert rules = ruler). 
+      ruler: loki-data   # You could put them in 3 different Azure containers, but for simplicity, 
+      admin: loki-data   # we tell Loki to dump everything into the single loki-data container you created.
+
+
+
+  # The TSDB Index Schema (The Phonebook rules)
+
+  schemaConfig:
+    configs:
+      - from: 2024-01-01
+        store: tsdb           # -> Use the modern Time Series Database format to store labels.
+        object_store: azure   # -> Save the phonebook in Azure.
+        schema: v13
+        index:
+          prefix: index_      # This makes searching faster (e.g., if you search for yesterday's logs, Loki only opens yesterday's index file, not a giant 5-year master file).
+          period: 24h         # -> Every 24 hours, create a new index file starting with the word
+
+
+
+  # The Retention Manager (To save your free-tier credits!)
+  
+  # The compactor is a background worker inside Loki. It needs some local disk space (working_directory) to do math. 
+  # We turn on retention_enabled and set the limit to 7d. Every day, the compactor looks at Azure Blob Storage, 
+  # finds any chunks older than 7 days, and sends an HTTP DELETE request to Azure to save your money.
+
+  compactor:
+    working_directory: /var/loki/compactor
+    shared_store: azure
+    retention_enabled: true
+    
+  limits_config:
+    retention_period: 7d # Loki will actively delete logs from Azure after 7 days
