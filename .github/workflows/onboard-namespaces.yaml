@@ -1,4 +1,4 @@
-name: Onboard Namespaces
+name: 01 Onboard Namespaces 
 
 # THIS is the Albertsons Magic! It dynamically names the workflow run.
 #run-name: Onboard NS | Cluster: ${{ inputs.target_cluster }} | CR: ${{ inputs.cr_number }} | By @${{ github.actor }}

@@ -1,10 +1,6 @@
 # INFRASTRUCTURE SETTINGS
 # Render command to see the final YAML that will be applied to Kubernetes. This is useful for debugging and learning how Helm works.
-# helm template my-loki grafana/loki \
-#   --namespace obs-shared \
-#   -f clusters/aks-shared-obs/loki/values.yaml \
-#   -f clusters/aks-shared-obs/loki/config.yaml \
-#   > rendered-loki.yaml
+# helm template my-loki grafana/loki --namespace obs-shared -f clusters/aks-shared-obs/loki/values.yaml -f clusters/aks-shared-obs/loki/config.yaml > rendered-loki.yaml
 
 
 # 1. FIX: Zero out the default SimpleScalable components
@@ -79,3 +75,54 @@ extraEnv:
       secretKeyRef:
         name: obs-shared-secrets   # Secret named obs-shared-secrets
         key: storage-account-key   # The passsord is stored under this storage-account-key name , use this in the place to ref the passwrd
+
+
+
+# --- CACHE OVERRIDES Troubleshoot and Solutions ---
+
+# Events:
+#   Type     Reason            Age                 From               Message
+#   ----     ------            ----                ----               -------
+#   Warning  FailedScheduling  12m (x12 over 67m)  default-scheduler  0/2 nodes are available: 1 Insufficient cpu, 2 Insufficient memory. preemption: 0/2 nodes are available: 2 No preemption victims found for incoming pod.
+
+
+# Even though you scaled up to 2 nodes, your kubectl top node shows your nodes only have about ~3GB to 4GB of total RAM each. 
+# So, a 10GB pod will never schedule there.
+
+# The Fix:
+# To override a hidden default in Helm, you just add the parent name to your values.yaml and provide your own numbers. 
+# For the Loki chart, the Memcached caches are controlled by the chunksCache and resultsCache blocks.
+# Open your values.yaml and paste this right at the bottom. This will drop the memory request from ~10GB down to 256Mi (256 Megabytes),
+# which will easily fit on your current Azure nodes!
+# Overriding the massive 10GB default memory requests so they fit on our smaller AKS nodes.
+
+
+# Notice the allocatedMemory: 256 line? The Grafana Helm chart is smart. 
+# When you set that value, the Helm template automatically does the math and changes 
+# that -m 8192 argument you saw in your rendered YAML to -m 256 so Memcached knows not to exceed the new Kubernetes limits.
+
+
+chunksCache:
+  allocatedMemory: 256  # This automatically changes the '-m 8192' argument to '-m 256'
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 256Mi
+
+resultsCache:
+  allocatedMemory: 256  
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 256Mi
+
+
+
+
+
+
+

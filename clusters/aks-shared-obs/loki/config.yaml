@@ -52,6 +52,7 @@ loki:
     working_directory: /var/loki/compactor
     #shared_store: azure
     retention_enabled: true
+    delete_request_store: azure
     
   limits_config:
     retention_period: 7d # Loki will actively delete logs from Azure after 7 days
