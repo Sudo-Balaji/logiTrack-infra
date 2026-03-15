@@ -1,10 +1,6 @@
 # INFRASTRUCTURE SETTINGS
 # Render command to see the final YAML that will be applied to Kubernetes. This is useful for debugging and learning how Helm works.
-# helm template my-loki grafana/loki \
-#   --namespace obs-shared \
-#   -f clusters/aks-shared-obs/loki/values.yaml \
-#   -f clusters/aks-shared-obs/loki/config.yaml \
-#   > rendered-loki.yaml
+# helm template my-loki grafana/loki --namespace obs-shared -f clusters/aks-shared-obs/loki/values.yaml -f clusters/aks-shared-obs/loki/config.yaml > rendered-loki.yaml
 
 
 # 1. FIX: Zero out the default SimpleScalable components
@@ -32,50 +28,86 @@ deploymentMode: SingleBinary
 
 singleBinary:
   replicas: 1
+  extraArgs:
+    - -config.expand-env=true # This tells Loki to expand environment variables in the config file, which allows us to inject the Azure Key as an Environment Variable and have Loki read it from there. When Kubernetes starts the container, it will now pass -config.expand-env=true as a command-line flag to Loki. Loki will see ${AZURE_STORAGE_KEY}, reach out to the Linux environment, grab the real Azure Key you injected from Key Vault, and successfully decode it to connect to your loki-data container.
   persistence:
     enabled: true
     size: 5Gi # This creates the K8s PVC automatically!
 
+  # Trigger the CSI Bridge to fetch the Azure Key
+  # We are modifying the Pod's blueprint. We are telling Kubernetes to attach a "virtual hard drive" (Volume) 
+  # named secrets-store-inline. But it's not a real disk; it's a connection to the csi (Container Storage Interface) driver. 
+  # We specifically tell it to use the recipe we wrote in VALK-301 called azure-kv-bridge.
+  extraVolumes:
+    - name: secrets-store-inline
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: "azure-kv-bridge"
+        nodePublishSecretRef:      # <--- ADDed THIS
+          name: kvcreds                # The CSI driver needs permission to talk to Azure Key Vault, so we create a Kubernetes Secret named kvcreds that holds the Azure credentials.
 
 
-
-
-# Trigger the CSI Bridge to fetch the Azure Key
-# We are modifying the Pod's blueprint. We are telling Kubernetes to attach a "virtual hard drive" (Volume) 
-# named secrets-store-inline. But it's not a real disk; it's a connection to the csi (Container Storage Interface) driver. 
-# We specifically tell it to use the recipe we wrote in VALK-301 called azure-kv-bridge.
-
-extraVolumes:
-  - name: secrets-store-inline
-    csi:
-      driver: secrets-store.csi.k8s.io
+  # Now that the virtual hard drive exists, we have to "plug it in" (mount it) to the Linux container. 
+  # We mount it to the folder path /mnt/secrets-store. Crucial: This is the exact moment the "Lazy Chef" wakes up,
+  # runs to Azure Key Vault, and creates our obs-shared-secrets file!
+  extraVolumeMounts:
+    - name: secrets-store-inline
+      mountPath: "/mnt/secrets-store"
       readOnly: true
-      volumeAttributes:
-        secretProviderClass: "azure-kv-bridge"
+
+  # Inject the Azure Key as an Environment Variable
+  # We are injecting an Environment Variable into the Linux container named AZURE_STORAGE_KEY. 
+  # Where does the value come from? It reads (secretKeyRef) from the K8s Secret named obs-shared-secrets 
+  # and pulls the value out of the storage-account-key line.
+  extraEnv:
+    - name: AZURE_STORAGE_KEY
+      valueFrom:
+        secretKeyRef:
+          name: obs-shared-secrets   # Secret named obs-shared-secrets
+          key: storage-account-key   # The passsord is stored under this storage-account-key name , use this in the place to ref the passwrd
 
 
 
+# --- CACHE OVERRIDES Troubleshoot and Solutions ---
 
-# Now that the virtual hard drive exists, we have to "plug it in" (mount it) to the Linux container. 
-# We mount it to the folder path /mnt/secrets-store. Crucial: This is the exact moment the "Lazy Chef" wakes up,
-# runs to Azure Key Vault, and creates our obs-shared-secrets file!
-
-extraVolumeMounts:
-  - name: secrets-store-inline
-    mountPath: "/mnt/secrets-store"
-    readOnly: true
+# Events:
+#   Type     Reason            Age                 From               Message
+#   ----     ------            ----                ----               -------
+#   Warning  FailedScheduling  12m (x12 over 67m)  default-scheduler  0/2 nodes are available: 1 Insufficient cpu, 2 Insufficient memory. preemption: 0/2 nodes are available: 2 No preemption victims found for incoming pod.
 
 
+# Even though you scaled up to 2 nodes, your kubectl top node shows your nodes only have about ~3GB to 4GB of total RAM each. 
+# So, a 10GB pod will never schedule there.
+
+# The Fix:
+# To override a hidden default in Helm, you just add the parent name to your values.yaml and provide your own numbers. 
+# For the Loki chart, the Memcached caches are controlled by the chunksCache and resultsCache blocks.
+# Open your values.yaml and paste this right at the bottom. This will drop the memory request from ~10GB down to 256Mi (256 Megabytes),
+# which will easily fit on your current Azure nodes!
+# Overriding the massive 10GB default memory requests so they fit on our smaller AKS nodes.
 
 
-# Inject the Azure Key as an Environment Variable
-# We are injecting an Environment Variable into the Linux container named AZURE_STORAGE_KEY. 
-# Where does the value come from? It reads (secretKeyRef) from the K8s Secret named obs-shared-secrets 
-# and pulls the value out of the storage-account-key line.
+# Notice the allocatedMemory: 256 line? The Grafana Helm chart is smart. 
+# When you set that value, the Helm template automatically does the math and changes 
+# that -m 8192 argument you saw in your rendered YAML to -m 256 so Memcached knows not to exceed the new Kubernetes limits.
 
-extraEnv:
-  - name: AZURE_STORAGE_KEY
-    valueFrom:
-      secretKeyRef:
-        name: obs-shared-secrets   # Secret named obs-shared-secrets
-        key: storage-account-key   # The passsord is stored under this storage-account-key name , use this in the place to ref the passwrd
+
+chunksCache:
+  allocatedMemory: 256  # This automatically changes the '-m 8192' argument to '-m 256'
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 256Mi
+
+resultsCache:
+  allocatedMemory: 256  
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 256Mi
