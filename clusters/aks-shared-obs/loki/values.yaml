@@ -28,6 +28,8 @@ deploymentMode: SingleBinary
 
 singleBinary:
   replicas: 1
+  extraArgs:
+    - -config.expand-env=true # This tells Loki to expand environment variables in the config file, which allows us to inject the Azure Key as an Environment Variable and have Loki read it from there. When Kubernetes starts the container, it will now pass -config.expand-env=true as a command-line flag to Loki. Loki will see ${AZURE_STORAGE_KEY}, reach out to the Linux environment, grab the real Azure Key you injected from Key Vault, and successfully decode it to connect to your loki-data container.
   persistence:
     enabled: true
     size: 5Gi # This creates the K8s PVC automatically!
