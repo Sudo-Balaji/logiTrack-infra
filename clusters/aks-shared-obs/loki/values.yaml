@@ -34,49 +34,36 @@ singleBinary:
     enabled: true
     size: 5Gi # This creates the K8s PVC automatically!
 
+  # Trigger the CSI Bridge to fetch the Azure Key
+  # We are modifying the Pod's blueprint. We are telling Kubernetes to attach a "virtual hard drive" (Volume) 
+  # named secrets-store-inline. But it's not a real disk; it's a connection to the csi (Container Storage Interface) driver. 
+  # We specifically tell it to use the recipe we wrote in VALK-301 called azure-kv-bridge.
+  extraVolumes:
+    - name: secrets-store-inline
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: "azure-kv-bridge"
 
-
-
-
-# Trigger the CSI Bridge to fetch the Azure Key
-# We are modifying the Pod's blueprint. We are telling Kubernetes to attach a "virtual hard drive" (Volume) 
-# named secrets-store-inline. But it's not a real disk; it's a connection to the csi (Container Storage Interface) driver. 
-# We specifically tell it to use the recipe we wrote in VALK-301 called azure-kv-bridge.
-
-extraVolumes:
-  - name: secrets-store-inline
-    csi:
-      driver: secrets-store.csi.k8s.io
+  # Now that the virtual hard drive exists, we have to "plug it in" (mount it) to the Linux container. 
+  # We mount it to the folder path /mnt/secrets-store. Crucial: This is the exact moment the "Lazy Chef" wakes up,
+  # runs to Azure Key Vault, and creates our obs-shared-secrets file!
+  extraVolumeMounts:
+    - name: secrets-store-inline
+      mountPath: "/mnt/secrets-store"
       readOnly: true
-      volumeAttributes:
-        secretProviderClass: "azure-kv-bridge"
 
-
-
-
-# Now that the virtual hard drive exists, we have to "plug it in" (mount it) to the Linux container. 
-# We mount it to the folder path /mnt/secrets-store. Crucial: This is the exact moment the "Lazy Chef" wakes up,
-# runs to Azure Key Vault, and creates our obs-shared-secrets file!
-
-extraVolumeMounts:
-  - name: secrets-store-inline
-    mountPath: "/mnt/secrets-store"
-    readOnly: true
-
-
-
-
-# Inject the Azure Key as an Environment Variable
-# We are injecting an Environment Variable into the Linux container named AZURE_STORAGE_KEY. 
-# Where does the value come from? It reads (secretKeyRef) from the K8s Secret named obs-shared-secrets 
-# and pulls the value out of the storage-account-key line.
-
-extraEnv:
-  - name: AZURE_STORAGE_KEY
-    valueFrom:
-      secretKeyRef:
-        name: obs-shared-secrets   # Secret named obs-shared-secrets
-        key: storage-account-key   # The passsord is stored under this storage-account-key name , use this in the place to ref the passwrd
+  # Inject the Azure Key as an Environment Variable
+  # We are injecting an Environment Variable into the Linux container named AZURE_STORAGE_KEY. 
+  # Where does the value come from? It reads (secretKeyRef) from the K8s Secret named obs-shared-secrets 
+  # and pulls the value out of the storage-account-key line.
+  extraEnv:
+    - name: AZURE_STORAGE_KEY
+      valueFrom:
+        secretKeyRef:
+          name: obs-shared-secrets   # Secret named obs-shared-secrets
+          key: storage-account-key   # The passsord is stored under this storage-account-key name , use this in the place to ref the passwrd
 
 
 
@@ -121,10 +108,3 @@ resultsCache:
       memory: 256Mi
     limits:
       memory: 256Mi
-
-
-
-
-
-
-
