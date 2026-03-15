@@ -38,14 +38,32 @@ jobs:
           helm repo add grafana https://grafana.github.io/helm-charts
           helm repo update
 
+      - name: Install Helm Diff Plugin
+        run: |
+          helm plugin install https://github.com/databus23/helm-diff
+
 
 
       # Notice we are downloading 'grafana/loki' but injecting OUR values.yaml and config.yaml. This is the beauty of Helm - we can use any public chart and customize it with our own settings!
 
       - name: Deploy Loki via Helm
         run: |
+
+          echo "--- START RENDERED HELM YAML ---"
+          # This command prints the final YAML to the GitHub Actions logs without deploying it
+          helm template my-loki grafana/loki --namespace obs-shared -f clusters/aks-shared-obs/loki/values.yaml -f clusters/aks-shared-obs/loki/config.yaml
+          echo "--- END RENDERED HELM YAML ---"
+
           echo "Connecting to aks-shared-obs..."
           az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name aks-shared-obs --overwrite-existing
+
+          echo "--- RESOURCE DIFF ANALYSIS ---"
+          echo "Checking what will be created, modified, or unchanged (using Helm Diff):"
+          helm diff upgrade --install loki grafana/loki \
+            --namespace obs-shared \
+            -f clusters/aks-shared-obs/loki/values.yaml \
+            -f clusters/aks-shared-obs/loki/config.yaml
+          echo "--- END RESOURCE DIFF ANALYSIS ---"
 
           echo "Deploying Loki with values.yaml AND config.yaml..."
           helm upgrade --install loki grafana/loki \
