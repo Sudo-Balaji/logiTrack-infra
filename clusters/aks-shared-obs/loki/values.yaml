@@ -20,6 +20,16 @@ deploymentMode: SingleBinary
 
 
 
+# --- NEW OVERRIDE ADDED HERE ---
+# To fix the Loki startup issue in SingleBinary mode, 
+# add the `replication_factor: 1` setting under `loki.commonConfig` in your `values.yaml`. 
+# This tells Loki to expect only one pod, preventing the "unhealthy ring" error caused by missing replicas in a single-pod setup.
+
+loki:
+  commonConfig:
+    replication_factor: 1
+
+
 
 # Configure the StatefulSet replicas and the local PVC
 # This tells Kubernetes to create a StatefulSet with exactly 1 Pod. The persistence lines tell Kubernetes to dynamically 
