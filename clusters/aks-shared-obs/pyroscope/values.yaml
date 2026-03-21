@@ -25,36 +25,31 @@ all:
 # Just like we do for Loki and Tempo, nest everything under pyroscope: key
 pyroscope:
 
+  # Inject the Azure Storage Key as an Environment Variable
+  # Note: The pyroscope chart expects extraEnvVars to be a dict/object, not a list like Kubernetes env
+  # We need to use a separate envFrom or pass it via the config
+  # For now, Pyroscope will read the storage key from the file: /mnt/secrets-store/storage-account-key
+  
   # This tells Pyroscope to expand environment variables in the config file
-  # So when Pyroscope sees ${AZURE_STORAGE_KEY} in the config, it will swap it with the real key
+  # So when Pyroscope sees references in the config, it will expand them
   extraArgs:
     config.expand-env: "true"
 
-  # Inject the Azure Storage Key as an Environment Variable
-  # This reaches into the obs-shared-secrets (created by CSI bridge) 
-  # and loads the master password into the container
-  extraEnv:
-    - name: AZURE_STORAGE_KEY
-      valueFrom:
-        secretKeyRef:
-          name: obs-shared-secrets
-          key: storage-account-key
-
-  # Mount the CSI secret store so Kubernetes can inject the env var
+  # Mount the CSI secret store so Kubernetes can inject the Azure storage key
+  # These MUST be under pyroscope: for proper merge into the StatefulSet template
   extraVolumeMounts:
     - name: secrets-store-inline
       mountPath: "/mnt/secrets-store"
       readOnly: true
 
-# CSI Bridge Volume Definition (mounted at the root level)
-# This tells Kubernetes to attach the azure-kv-bridge CSI driver
-# The CSI driver fetches the Azure Storage Key from Key Vault and creates obs-shared-secrets
-extraVolumes:
-  - name: secrets-store-inline
-    csi:
-      driver: secrets-store.csi.k8s.io
-      readOnly: true
-      volumeAttributes:
-        secretProviderClass: "azure-kv-bridge"
-      nodePublishSecretRef:      
-        name: kvcreds
+  # CSI Bridge Volume Definition
+  # These MUST be under pyroscope: for proper merge into the StatefulSet volumes section
+  extraVolumes:
+    - name: secrets-store-inline
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: "azure-kv-bridge"
+        nodePublishSecretRef:      
+          name: kvcreds

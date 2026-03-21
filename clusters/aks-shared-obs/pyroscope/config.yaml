@@ -4,19 +4,22 @@
 # Pyroscope will read the Azure key directly from the CSI-mounted secret file
 # The file is mounted at /mnt/secrets-store/storage-account-key by the CSI driver
 
-pyroscope:
-  config: |
-    auth_enabled: false
+# Top-level: Turn off internal authentication (private cluster)
+auth_enabled: false
 
-    storage:
-      backend: azure
-      azure:
-        container_name: pyroscope-data
-        storage_account_name: valkiobsstorage2026
-        storage_account_key_file: /mnt/secrets-store/storage-account-key
+# Top-level: Configure storage backend
+storage:
+  backend: azure
+  azure:
+    container_name: pyroscope-data
+    storage_account_name: valkiobsstorage2026
+    storage_account_key_file: /mnt/secrets-store/storage-account-key
 
-    compactor:
-      retention_enabled: true
-    
-    limits:
-      retention_period: 7d
+# Top-level: Enable automatic data retention (delete old data)
+compactor:
+  retention_enabled: true
+  compaction_interval: 10m
+
+# Top-level: Set data retention period
+limits:
+  retention_period: 7d
