@@ -16,7 +16,7 @@ extraVolumes:
       volumeAttributes:
         secretProviderClass: "azure-kv-bridge"
       nodePublishSecretRef:      # <--- ADDed THIS
-          name: kvcreds                # The CSI driver needs permission to talk to Azure Key Vault, so we create a Kubernetes Secret named kvcreds that holds the Azure credentials(i.e service principles).
+        name: kvcreds                # The CSI driver needs permission to talk to Azure Key Vault, so we create a Kubernetes Secret named kvcreds that holds the Azure credentials(i.e service principles).
 
 
 
