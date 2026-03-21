@@ -1,6 +1,7 @@
-name: 03 - Deploy Loki Database
+name: 04 - Deploy Tempo Database
 
-run-name: "Deploy Loki | Cluster: aks-shared-obs | CR: ${{ inputs.cr_number }} | Description: ${{ inputs.cr_description }} | By @${{ github.actor }}"
+# Double quotes to prevent YAML parsing errors!
+run-name: "Deploy Tempo | Cluster: aks-shared-obs | | CR: ${{ inputs.cr_number }} | Description: ${{ inputs.cr_description }} | By @${{ github.actor }}"
 
 on:
   workflow_dispatch:
@@ -19,7 +20,7 @@ env:
   RESOURCE_GROUP: "valki-ent-rg"
 
 jobs:
-  deploy-loki:
+  deploy-tempo:
     runs-on: ubuntu-latest
 
     steps:
@@ -30,9 +31,9 @@ jobs:
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-      
-      # We must add the official Grafana Helm repository to the runner before we can deploy Loki, since Loki is a Grafana product and is hosted in their repo.
 
+     # We must add the official Grafana Helm repository to the runner before we can deploy tempo, since tempo is a Grafana product and is hosted in their repo.
+      
       - name: Add Grafana Helm Repo
         run: |
           helm repo add grafana https://grafana.github.io/helm-charts
@@ -42,29 +43,29 @@ jobs:
         run: |
           helm plugin install https://github.com/databus23/helm-diff
 
-      # Notice we are downloading 'grafana/loki' but injecting OUR values.yaml and config.yaml. This is the beauty of Helm - we can use any public chart and customize it with our own settings!
+      # Notice we are downloading 'grafana/tempo' but injecting OUR values.yaml and config.yaml. This is the beauty of Helm - we can use any public chart and customize it with our own settings!
 
-      - name: Deploy Loki via Helm
+      - name: Deploy Tempo via Helm
         run: |
 
           echo "--- START RENDERED HELM YAML ---"
           # This command prints the final YAML to the GitHub Actions logs without deploying it
-          helm template my-loki grafana/loki --namespace obs-shared -f clusters/aks-shared-obs/loki/values.yaml -f clusters/aks-shared-obs/loki/config.yaml
+          helm template my-tempo grafana/tempo --namespace obs-shared -f clusters/aks-shared-obs/tempo/values.yaml -f clusters/aks-shared-obs/tempo/config.yaml
           echo "--- END RENDERED HELM YAML ---"
 
           echo "Connecting to aks-shared-obs..."
           az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name aks-shared-obs --overwrite-existing
-
+          
           echo "--- RESOURCE DIFF ANALYSIS ---"
           echo "Checking what will be created, modified, or unchanged (using Helm Diff):"
-          helm diff upgrade --install loki grafana/loki \
+          helm diff upgrade --install tempo grafana/tempo \
             --namespace obs-shared \
-            -f clusters/aks-shared-obs/loki/values.yaml \
-            -f clusters/aks-shared-obs/loki/config.yaml
+            -f clusters/aks-shared-obs/tempo/values.yaml \
+            -f clusters/aks-shared-obs/tempo/config.yaml
           echo "--- END RESOURCE DIFF ANALYSIS ---"
 
-          echo "Deploying Loki with values.yaml AND config.yaml..."
-          helm upgrade --install loki grafana/loki \
+          echo "Deploying Tempo with values.yaml AND config.yaml..."
+          helm upgrade --install tempo grafana/tempo \
             --namespace obs-shared \
-            -f clusters/aks-shared-obs/loki/values.yaml \
-            -f clusters/aks-shared-obs/loki/config.yaml
+            -f clusters/aks-shared-obs/tempo/values.yaml \
+            -f clusters/aks-shared-obs/tempo/config.yaml

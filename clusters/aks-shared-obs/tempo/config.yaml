@@ -1,0 +1,15 @@
+# TEMPO APPLICATION CONFIGURATION
+
+tempo:
+  storage:
+    trace:
+      # Tell Tempo to use Azure Object Storage
+      backend: azure
+      azure:
+        container_name: tempo-data
+        storage_account_name: valkiobsstorage2026
+        storage_account_key: ${AZURE_STORAGE_KEY}
+      
+      # Tell Tempo where its local temporary workspace is
+      wal:
+        path: /var/tempo/wal
