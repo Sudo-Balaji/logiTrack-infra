@@ -56,7 +56,7 @@ singleBinary:
         volumeAttributes:
           secretProviderClass: "azure-kv-bridge"
         nodePublishSecretRef:      # <--- ADDed THIS
-          name: kvcreds                # The CSI driver needs permission to talk to Azure Key Vault, so we create a Kubernetes Secret named kvcreds that holds the Azure credentials.
+          name: kvcreds                # The CSI driver needs permission to talk to Azure Key Vault, so we create a Kubernetes Secret named kvcreds that holds the Azure credentials(i.e service principles).
 
 
   # Now that the virtual hard drive exists, we have to "plug it in" (mount it) to the Linux container. 
