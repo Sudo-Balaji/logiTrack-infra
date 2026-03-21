@@ -1,0 +1,87 @@
+# INFRASTRUCTURE SETTINGS
+
+# Rendered command := helm template my-tempo grafana/tempo --namespace obs-shared -f clusters/aks-shared-obs/tempo/values.yaml -f clusters/aks-shared-obs/tempo/config.yaml > rendered-tempo.yaml
+
+# 1. Mount the exact same CSI Bridge we built for Loki
+
+# extraVolumes / extraVolumeMounts: We are telling Kubernetes, "Hey, attach the azure-kv-bridge to this Tempo pod." 
+# Because the "Lazy Chef" (CSI Driver) already fetched the Azure Storage Key during the Loki deployment, 
+# this mount happens instantly.
+
+extraVolumes:
+  - name: secrets-store-inline
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes:
+        secretProviderClass: "azure-kv-bridge"
+
+# We just need to shift the environment variables and the volume mounts under the tempo: key.
+
+# if you look at how Grafana's developers named their variables, they use the word extra for 
+# everything that we inject from the outside. They expect extraVolumeMounts (which worked perfectly).
+# They expect extraEnv (but I accidentally gave you env!). Because I gave you env, Helm said: "I don't know what env is, 
+# I only accept extraEnv" and it just ignored our Azure key entirely!
+
+tempo:
+  extraEnv:
+    - name: AZURE_STORAGE_KEY
+      valueFrom:
+        secretKeyRef:
+          name: obs-shared-secrets
+          key: storage-account-key
+
+  extraVolumeMounts:
+    - name: secrets-store-inline
+      mountPath: "/mnt/secrets-store"
+      readOnly: true
+
+# 2. Inject the Azure Storage Key as an Environment Variable
+
+# extraEnv: We reach into the obs-shared-secrets file and load the master password into 
+# the Linux container as AZURE_STORAGE_KEY.
+
+# if we use this method, we must also add the CSI Bridge as a volume mount (as shown above) because the Helm chart needs to see the secret in the filesystem to inject it as an env variable. This is a quirk of how the Helm chart is designed.
+
+################## IMPORTANT NOTE ON TEMPO ENV AND VOLUME MOUNTS ##################
+
+# By using the below given extraVolumeMounts and extraEnv together, in the rendered manifest we can Notice how env: is completely empty, and secrets-store-inline is missing from the volumeMounts? REFER rendered-temp_v1.yaml file on line 227 
+# Why did this happen? Because the developers who wrote the grafana/tempo Helm chart used different variable names than the developers who wrote the grafana/loki Helm chart! (Welcome to the chaotic world of open-source DevOps 😅).
+# In Loki, we put extraEnv and extraVolumeMounts at the root of the file.
+# In Tempo, they explicitly require those exact settings to be nested inside a tempo: block. Because we put them at the root, Helm just ignored them! -> refer line 18 onwards as solution to this problem.
+
+# extraVolumeMounts:
+#   - name: secrets-store-inline
+#     mountPath: "/mnt/secrets-store"
+#     readOnly: true
+
+# extraEnv:
+#   - name: AZURE_STORAGE_KEY
+#     valueFrom:
+#       secretKeyRef:
+#         name: obs-shared-secrets
+#         key: storage-account-key
+
+
+# 3. Open the doors for Traces (OTLP Ports)
+
+# traces.otlp.grpc: This is critical. OTLP (OpenTelemetry Protocol) is the universal language for Traces. 
+# By setting this to true, Kubernetes opens port 4317. In the next sprint, 
+# Alloy will drive its delivery truck straight to this port to drop off the traces!
+
+traces:
+  otlp:
+    grpc:
+      enabled: true
+    http:
+      enabled: true
+
+
+# 4. Provision the local temporary Hard Drive (PVC)
+
+# persistence: We tell Azure to create a 5GB Managed Disk. Tempo uses this as its Write-Ahead Log (WAL) 
+# to hold traces for a few minutes before zipping them to Azure Blob.
+
+persistence:
+  enabled: true
+  size: 5Gi
