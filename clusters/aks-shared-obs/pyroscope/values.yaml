@@ -1,0 +1,60 @@
+# INFRASTRUCTURE SETTINGS
+
+# Render command: helm template my-pyroscope grafana/pyroscope --namespace obs-shared -f clusters/aks-shared-obs/pyroscope/values.yaml > rendered-pyroscope.yaml
+
+deploymentMode: SingleBinary
+
+all:
+  replicas: 1
+  
+  # The PVC (persistent volume for temporary data)
+  persistentVolume:
+    enabled: true
+    size: 5Gi
+
+  # Inject the Azure Storage Key as an Environment Variable
+  # Since Pyroscope chart structure is different, we inject env vars here at 'all' level
+  env:
+    - name: AZURE_STORAGE_KEY
+      valueFrom:
+        secretKeyRef:
+          name: obs-shared-secrets
+          key: storage-account-key
+
+# Pyroscope Application Configuration (passed to the container)
+# Just like we do for Loki and Tempo, nest everything under pyroscope: key
+pyroscope:
+
+  # This tells Pyroscope to expand environment variables in the config file
+  # So when Pyroscope sees ${AZURE_STORAGE_KEY} in the config, it will swap it with the real key
+  extraArgs:
+    config.expand-env: "true"
+
+  # Inject the Azure Storage Key as an Environment Variable
+  # This reaches into the obs-shared-secrets (created by CSI bridge) 
+  # and loads the master password into the container
+  extraEnv:
+    - name: AZURE_STORAGE_KEY
+      valueFrom:
+        secretKeyRef:
+          name: obs-shared-secrets
+          key: storage-account-key
+
+  # Mount the CSI secret store so Kubernetes can inject the env var
+  extraVolumeMounts:
+    - name: secrets-store-inline
+      mountPath: "/mnt/secrets-store"
+      readOnly: true
+
+# CSI Bridge Volume Definition (mounted at the root level)
+# This tells Kubernetes to attach the azure-kv-bridge CSI driver
+# The CSI driver fetches the Azure Storage Key from Key Vault and creates obs-shared-secrets
+extraVolumes:
+  - name: secrets-store-inline
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes:
+        secretProviderClass: "azure-kv-bridge"
+      nodePublishSecretRef:      
+        name: kvcreds

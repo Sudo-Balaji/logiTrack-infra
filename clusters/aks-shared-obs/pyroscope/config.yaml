@@ -1,0 +1,22 @@
+# PYROSCOPE APPLICATION CONFIGURATION
+
+# This config is merged into the Helm template via values.yaml
+# Pyroscope will read the Azure key directly from the CSI-mounted secret file
+# The file is mounted at /mnt/secrets-store/storage-account-key by the CSI driver
+
+pyroscope:
+  config: |
+    auth_enabled: false
+
+    storage:
+      backend: azure
+      azure:
+        container_name: pyroscope-data
+        storage_account_name: valkiobsstorage2026
+        storage_account_key_file: /mnt/secrets-store/storage-account-key
+
+    compactor:
+      retention_enabled: true
+    
+    limits:
+      retention_period: 7d
