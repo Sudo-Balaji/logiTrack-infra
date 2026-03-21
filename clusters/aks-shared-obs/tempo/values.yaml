@@ -15,6 +15,10 @@ extraVolumes:
       readOnly: true
       volumeAttributes:
         secretProviderClass: "azure-kv-bridge"
+      nodePublishSecretRef:      # <--- ADDed THIS
+        name: kvcreds                # The CSI driver needs permission to talk to Azure Key Vault, so we create a Kubernetes Secret named kvcreds that holds the Azure credentials(i.e service principles).
+
+
 
 # We just need to shift the environment variables and the volume mounts under the tempo: key.
 
@@ -24,6 +28,15 @@ extraVolumes:
 # I only accept extraEnv" and it just ignored our Azure key entirely!
 
 tempo:
+
+  # This tells Tempo to look for environment variables in the config file and replace them with their actual values. 
+  # So when Tempo sees ${AZURE_STORAGE_KEY} in the config, it will swap it with the real key from the secret.
+  # by default this is set to false by tempo developers because they don't want to encourage people to put secrets in their config file, 
+  # but since we are using CSI Bridge to inject the secret as an env variable, this is perfectly safe and exactly what we need.
+
+  extraArgs:
+    config.expand-env: "true"
+
   extraEnv:
     - name: AZURE_STORAGE_KEY
       valueFrom:
@@ -61,6 +74,7 @@ tempo:
 #       secretKeyRef:
 #         name: obs-shared-secrets
 #         key: storage-account-key
+   
 
 
 # 3. Open the doors for Traces (OTLP Ports)
