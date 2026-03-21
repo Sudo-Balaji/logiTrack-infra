@@ -1,0 +1,70 @@
+name: 05 - Deploy Pyroscope Database
+
+run-name: "Deploy Pyroscope | Cluster: aks-shared-obs | CR: ${{ inputs.cr_number }} | Description: ${{ inputs.cr_description }} | By @${{ github.actor }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      cr_number:
+        description: 'Change Request (CR) Number'
+        required: true
+        type: string
+
+      cr_description:
+        description: 'Notes about the change request'
+        required: true
+        type: string
+
+env:
+  RESOURCE_GROUP: "valki-ent-rg"
+
+jobs:
+  deploy-pyroscope:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      # We must add the official Grafana Helm repository to the runner before we can deploy pyroscope, since pyroscope is a Grafana product and is hosted in their repo.
+
+      - name: Add Grafana Helm Repo
+        run: |
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo update
+
+      - name: Install Helm Diff Plugin
+        run: |
+          helm plugin install https://github.com/databus23/helm-diff
+
+      # Notice we are downloading 'grafana/pyroscope' but injecting OUR values.yaml and config.yaml. This is the beauty of Helm - we can use any public chart and customize it with our own settings!
+
+      - name: Deploy Pyroscope via Helm
+        run: |
+
+          echo "--- START RENDERED HELM YAML ---"
+          # This command prints the final YAML to the GitHub Actions logs without deploying it
+          helm template my-pyroscope grafana/pyroscope --namespace obs-shared -f clusters/aks-shared-obs/pyroscope/values.yaml -f clusters/aks-shared-obs/pyroscope/config.yaml
+          echo "--- END RENDERED HELM YAML ---"
+
+          echo "Connecting to aks-shared-obs..."
+          az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name aks-shared-obs --overwrite-existing
+
+          echo "--- RESOURCE DIFF ANALYSIS ---"
+          echo "Checking what will be created, modified, or unchanged (using Helm Diff):"
+          helm diff upgrade --install pyroscope grafana/pyroscope \
+            --namespace obs-shared \
+            -f clusters/aks-shared-obs/pyroscope/values.yaml \
+            -f clusters/aks-shared-obs/pyroscope/config.yaml
+          echo "--- END RESOURCE DIFF ANALYSIS ---"
+
+          echo "Deploying pyroscope with values.yaml AND config.yaml..."
+          helm upgrade --install pyroscope grafana/pyroscope \
+            --namespace obs-shared \
+            -f clusters/aks-shared-obs/pyroscope/values.yaml \
+            -f clusters/aks-shared-obs/pyroscope/config.yaml
