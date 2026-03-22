@@ -3,7 +3,7 @@ image:
   repository: valkiacr002.azurecr.io/logitrack
   tag: prod-v1.0.0-RELEASE
 
-# Routing across to the obs-shared cluster
+# Push data to the LOCAL Alloy Delivery Truck!
 observability:
-  tempoEndpoint: "http://tempo.obs-shared.svc.cluster.local:4317"
-  pyroscopeEndpoint: "http://pyroscope.obs-shared.svc.cluster.local:4040"
+  tempoEndpoint: "http://alloy.logitrack-app.svc.cluster.local:4317"
+  pyroscopeEndpoint: "http://alloy.logitrack-app.svc.cluster.local:4040"
