@@ -113,7 +113,10 @@ alloy:
       }
 
       pyroscope.receive_http "default" {
-        http { listen_address = "0.0.0.0:4040" }
+        http { 
+          listen_address = "0.0.0.0"
+          listen_port = 4040 
+        }
         forward_to = [pyroscope.write.backend.receiver]
       }
 
@@ -121,21 +124,22 @@ alloy:
       // 5. EGRESS / REMOTE WRITE (VALK-404)
       // Ship everything to the obs-shared cluster
       // ==========================================
+  
       prometheus.remote_write "backend" {
-        endpoint { url = "http://prometheus-server.obs-shared.svc.cluster.local:80/api/v1/write" }
+      endpoint { url = "http://10.20.1.5:80/api/v1/write" }
       }
 
       loki.write "backend" {
-        endpoint { url = "http://loki-gateway.obs-shared.svc.cluster.local:80/loki/api/v1/push" }
+      endpoint { url = "http://10.20.1.6:80/loki/api/v1/push" }
       }
 
       otelcol.exporter.otlp "tempo" {
-        client {
-          endpoint = "http://tempo.obs-shared.svc.cluster.local:4317"
-          tls { insecure = true }
-        }
+      client {
+        endpoint = "http://10.20.1.7:4317"
+        tls { insecure = true }
+      }
       }
 
       pyroscope.write "backend" {
-        endpoint { url = "http://pyroscope.obs-shared.svc.cluster.local:4040" }
+      endpoint { url = "http://10.20.1.8:4040" }
       }
