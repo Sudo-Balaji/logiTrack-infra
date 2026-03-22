@@ -41,7 +41,8 @@ datasources:
     datasources:
       - name: Prometheus
         type: prometheus
-        url: http://my-prom-prometheus-server.obs-shared.svc.cluster.local:80
+        # FIXED: Removed 'my-prom-'
+        url: http://prometheus-server.obs-shared.svc.cluster.local:80
         access: proxy
         isDefault: true
       - name: Loki
@@ -50,9 +51,11 @@ datasources:
         access: proxy
       - name: Tempo
         type: tempo
-        url: http://tempo.obs-shared.svc.cluster.local:3100
+        # FIXED: Changed port from 3100 to 3200
+        url: http://tempo.obs-shared.svc.cluster.local:3200
         access: proxy
       - name: Pyroscope
         type: pyroscope
-        url: http://my-pyroscope.obs-shared.svc.cluster.local:4040
+        # FIXED: Removed 'my-'
+        url: http://pyroscope.obs-shared.svc.cluster.local:4040
         access: proxy
