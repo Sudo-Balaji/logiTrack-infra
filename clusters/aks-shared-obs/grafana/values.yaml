@@ -1,13 +1,20 @@
 # GRAFANA CONFIGURATION
 
-
+# Admin user configuration
 adminUser: admin
-adminPassword: "dummy" # This is a dummy value. The real password is injected securely via the CSI driver and read by Grafana at runtime.
+# Don't use a Kubernetes secret for password - use CSI file instead
+# admin.existingSecret: "" will prevent Helm from trying to create a secret
 
+admin:
+  # Don't reference an existing secret - let Grafana read from file
+  existingSecret: ""
+  userKey: "admin-user"
+  passwordKey: "admin-password"
 
-# 1. The Security Injection
+# 1. The Security Injection - Environment Variables
 env:
-  # Tell Grafana to read the new human-readable password from the CSI file!
+  # Tell Grafana to read the admin password from the CSI-mounted file
+  # The CSI driver will fetch this from Azure Key Vault (grafana-admin-password secret)
   GF_SECURITY_ADMIN_PASSWORD__FILE: "/mnt/secrets-store/grafana-admin-password"
 
 extraVolumeMounts:
