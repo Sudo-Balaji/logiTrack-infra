@@ -1,0 +1,46 @@
+# GRAFANA CONFIGURATION
+
+# 1. The Security Injection
+env:
+  # Tell Grafana to read the new human-readable password from the CSI file!
+  GF_SECURITY_ADMIN_PASSWORD__FILE: "/mnt/secrets-store/grafana-admin-password"
+
+extraVolumeMounts:
+  - name: secrets-store-inline
+    mountPath: "/mnt/secrets-store"
+    readOnly: true
+
+extraVolumes:
+  - name: secrets-store-inline
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes:
+        # Assuming you kept the same bridge name from Sprint 2
+        secretProviderClass: "azure-kv-bridge"
+      nodePublishSecretRef:      
+        name: kvcreds            
+
+# 2. Auto-Link the Data Sources (Zero ClickOps)
+# This wires up the 4 databases using internal Kubernetes DNS.
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://my-prom-prometheus-server.obs-shared.svc.cluster.local:80
+        access: proxy
+        isDefault: true
+      - name: Loki
+        type: loki
+        url: http://loki-gateway.obs-shared.svc.cluster.local:80
+        access: proxy
+      - name: Tempo
+        type: tempo
+        url: http://tempo.obs-shared.svc.cluster.local:3100
+        access: proxy
+      - name: Pyroscope
+        type: pyroscope
+        url: http://my-pyroscope.obs-shared.svc.cluster.local:4040
+        access: proxy
