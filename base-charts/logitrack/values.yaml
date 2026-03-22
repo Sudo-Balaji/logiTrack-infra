@@ -1,0 +1,32 @@
+image:
+  repository: placeholder
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 1
+
+service:
+  port: 8084
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "500m"
+    memory: "1Gi"
+
+observability:
+  tempoEndpoint: ""
+  pyroscopeEndpoint: ""
+
+# Health Checks
+probes:
+  path: "/actuator/health"
+  initialDelaySeconds: 30
+
+# Security
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false

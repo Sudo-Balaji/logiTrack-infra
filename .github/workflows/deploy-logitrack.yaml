@@ -1,0 +1,55 @@
+name: 08 - Deploy LogiTrack Application
+
+run-name: "Deploy LogiTrack | Cluster: aks-app-01 | CR: ${{ inputs.cr_number }} | Description: ${{ inputs.cr_description }} | By @${{ github.actor }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      cr_number:
+        description: 'Change Request (CR) Number'
+        required: true
+        type: string
+
+      cr_description:
+        description: 'Notes about the change request'
+        required: true
+        type: string
+
+
+env:
+  RESOURCE_GROUP: "valki-ent-rg"
+
+jobs:
+  deploy-app:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # NEW: The Validation Step!
+      - name: Render Helm Chart (Validation & Dry Run)
+        run: |
+          echo "Compiling Helm templates to verify YAML syntax..."
+          helm template logitrack ./base-charts/logitrack \
+            --namespace logitrack-app \
+            -f clusters/aks-app-01/logitrack/values.yaml > rendered-logitrack.yaml
+          
+          echo "--- RENDERED OUTPUT FOR DEBUGGING ---"
+          cat rendered-logitrack.yaml
+          echo "--- END OF RENDERED OUTPUT ---" 
+
+      - name: Deploy Application via Helm
+        run: |
+          echo "Connecting to aks-app-01..."
+          az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name aks-app-01 --overwrite-existing
+
+          echo "Deploying LogiTrack..."
+          helm upgrade --install logitrack ./base-charts/logitrack \
+            --namespace logitrack-app \
+            -f clusters/aks-app-01/logitrack/values.yaml

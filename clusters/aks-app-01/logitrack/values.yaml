@@ -1,0 +1,9 @@
+# Environment: aks-app-01
+image:
+  repository: valkiacr002.azurecr.io/logitrack
+  tag: prod-v1.0.0-RELEASE
+
+# Routing across to the obs-shared cluster
+observability:
+  tempoEndpoint: "http://tempo.obs-shared.svc.cluster.local:4317"
+  pyroscopeEndpoint: "http://pyroscope.obs-shared.svc.cluster.local:4040"
