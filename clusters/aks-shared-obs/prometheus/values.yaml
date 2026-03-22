@@ -13,7 +13,10 @@ server:
 
   extraFlags:
     - web.enable-remote-write-receiver
-    - storage.tsdb.retention.time=15d
+    #- storage.tsdb.retention.time=15d     ## -> Prometheus is written in the Go programming language. Go applications are extremely strict—if you pass the exact same startup argument twice, the application instantly crashes to protect itself.
+                                            # The Prometheus Helm chart automatically injects a default 15-day retention. Because I also had you put it in the extraFlags block in our values.yaml, we duplicated it, and the pod killed itself on startup!
+                                            # The Fix
+                                            # We just need to delete that extra flag from our file and use the Helm chart's native variable instead.
 
   # Provision the local fast Hard Drive (PVC) upgraded to 10Gi
   persistentVolume:
