@@ -55,7 +55,7 @@ datasources:
         url: http://tempo.obs-shared.svc.cluster.local:3200
         access: proxy
       - name: Pyroscope
-        type: pyroscope
+        type: grafana-pyroscope-datasource
         # FIXED: Removed 'my-'
         url: http://pyroscope.obs-shared.svc.cluster.local:4040
         access: proxy
