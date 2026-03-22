@@ -40,6 +40,11 @@ spec:
               value: {{ .Values.observability.tempoEndpoint | quote }}
             - name: PYROSCOPE_SERVER_ADDRESS
               value: {{ .Values.observability.pyroscopeEndpoint | quote }}
+            # Add these two lines to stop redundant OTLP pushes!
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
               
           # Kubernetes Health Inspectors
           livenessProbe:
