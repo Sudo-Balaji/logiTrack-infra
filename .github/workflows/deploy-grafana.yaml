@@ -1,0 +1,54 @@
+name: 07 - Deploy Grafana UI
+
+run-name: "Deploy Grafana UI | Cluster: aks-shared-obs | CR: ${{ inputs.cr_number }} | Description: ${{ inputs.cr_description }} | By @${{ github.actor }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      cr_number:
+        description: 'Change Request (CR) Number'
+        required: true
+        type: string
+
+      cr_description:
+        description: 'Notes about the change request'
+        required: true
+        type: string
+
+
+env:
+  RESOURCE_GROUP: "valki-ent-rg"
+
+jobs:
+  deploy-grafana:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Add Grafana Helm Repo
+        run: |
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo update
+
+      - name: Deploy Grafana via Helm
+        run: |
+
+          echo "--- START RENDERED HELM YAML ---"
+          # This command prints the final YAML to the GitHub Actions logs without deploying it
+          helm template grafana grafana/grafana --namespace obs-shared -f clusters/aks-shared-obs/grafana/values.yaml
+          echo "--- END RENDERED HELM YAML ---"
+
+          echo "Connecting to aks-shared-obs..."
+          az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name aks-shared-obs --overwrite-existing
+          
+          echo "Deploying Grafana UI..."
+          helm upgrade --install grafana grafana/grafana \
+            --namespace obs-shared \
+            -f clusters/aks-shared-obs/grafana/values.yaml
