@@ -6,4 +6,11 @@ image:
 # Push data to the LOCAL Alloy Delivery Truck!
 observability:
   tempoEndpoint: "http://alloy.logitrack-app.svc.cluster.local:4317"
-  pyroscopeEndpoint: "http://alloy.logitrack-app.svc.cluster.local:4040"
+  pyroscopeEndpoint: "http://10.20.1.8:4040" 
+  #pyroscopeEndpoint: "http://alloy.logitrack-app.svc.cluster.local:4040"
+# Here is exactly what happened: Unlike text logs or tiny metrics, Java profiling uses JFR (Java Flight Recorder) to generate massive, heavy binary files. When your Java app tried to hand this massive file to the local Alloy delivery truck, it took longer than 10 seconds. The Java app has a strict internal 10-second timeout, so it panicked, dropped the file, and eventually gave up completely.
+
+# The Architectural Fix: The "Fast Lane"
+# Because you successfully peered the VNETs between your two clusters, we don't actually need to force these massive binary files through the local Alloy middleman. We can build a direct "Fast Lane" straight from the Java app to the Pyroscope ILB.
+
+
