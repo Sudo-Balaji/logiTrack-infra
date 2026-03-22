@@ -1,0 +1,19 @@
+# VALK-401: Alloy Deployment Configuration
+alloy:
+  # Architecture Strategy: Run on every single node to catch all pod traffic
+  controller:
+    type: daemonset
+
+  # We need to give Alloy permission to read the Kubernetes API later
+  rbac:
+    create: true
+
+  # The Skeleton Configuration
+  # We will inject the actual pipelines for VALK-402, 403, and 404 here later!
+  configMap:
+    content: |
+      // Base logging configuration for the Alloy agent itself
+      logging {
+        level = "info"
+        format = "logfmt"
+      }
