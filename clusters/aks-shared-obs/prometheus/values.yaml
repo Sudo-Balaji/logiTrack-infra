@@ -1,0 +1,43 @@
+# PROMETHEUS CONFIGURATION
+
+# 1. Configure the Main Server
+server:
+  # THE CRITICAL FIX: Unlock the door so Alloy can push metrics later
+
+  # extraFlags: This is the most important part of the file. 
+  # By default, Prometheus strictly pulls data. Passing web.enable-remote-write-receiver tells 
+  # the Prometheus Go binary to open a specific API endpoint that accepts incoming data payloads.
+    
+  # storage.tsdb.retention.time=15d: This tells the Time-Series Database (TSDB) engine to physically 
+  # drop data chunks older than 15 days, preventing your 10Gi disk from ever hitting 100% capacity.
+
+  extraFlags:
+    - web.enable-remote-write-receiver
+    - storage.tsdb.retention.time=15d
+
+  # Provision the local fast Hard Drive (PVC) upgraded to 10Gi
+  persistentVolume:
+    enabled: true
+    size: 10Gi
+
+# 2. Turn OFF unnecessary bloatware
+alertmanager:
+  enabled: false
+
+prometheus-pushgateway:
+  enabled: false
+
+# 3. Turn ON the Enterprise Auditors!
+
+# prometheus-node-exporter: enabled: true: Helm will automatically deploy a DaemonSet 
+# (one pod on every single Azure VM) to measure hardware CPU/RAM limits.
+
+prometheus-node-exporter:
+  enabled: true
+
+
+# kube-state-metrics: enabled: true: Helm will automatically deploy a single pod that 
+# talks directly to the Kubernetes API to measure pod crashes and deployment states.
+
+kube-state-metrics:
+  enabled: true
