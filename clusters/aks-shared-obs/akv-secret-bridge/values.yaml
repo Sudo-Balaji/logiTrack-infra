@@ -2,7 +2,7 @@ keyvaultName: "valki-kv-prod-01" # Make sure this matches your actual Key Vault 
 tenantId: "6ba4855b-b65e-4ece-bdaf-45f226d48d9f"
 secrets:
 
-  # This pulls 'grafana-admin-password' from Azure and names the K8s key 'admin-password'
+  # Grafana admin password (from Azure Key Vault)
   - secretName: grafana-admin-password
     k8sKey: admin-password
 

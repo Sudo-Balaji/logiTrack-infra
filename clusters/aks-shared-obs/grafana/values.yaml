@@ -1,8 +1,20 @@
 # GRAFANA CONFIGURATION
 
-# 1. The Security Injection
+# Admin user configuration
+adminUser: admin
+# Don't use a Kubernetes secret for password - use CSI file instead
+# admin.existingSecret: "" will prevent Helm from trying to create a secret
+
+admin:
+  # Don't reference an existing secret - let Grafana read from file
+  existingSecret: ""
+  userKey: "admin-user"
+  passwordKey: "admin-password"
+
+# 1. The Security Injection - Environment Variables
 env:
-  # Tell Grafana to read the new human-readable password from the CSI file!
+  # Tell Grafana to read the admin password from the CSI-mounted file
+  # The CSI driver will fetch this from Azure Key Vault (grafana-admin-password secret)
   GF_SECURITY_ADMIN_PASSWORD__FILE: "/mnt/secrets-store/grafana-admin-password"
 
 extraVolumeMounts:
@@ -29,7 +41,8 @@ datasources:
     datasources:
       - name: Prometheus
         type: prometheus
-        url: http://my-prom-prometheus-server.obs-shared.svc.cluster.local:80
+        # FIXED: Removed 'my-prom-'
+        url: http://prometheus-server.obs-shared.svc.cluster.local:80
         access: proxy
         isDefault: true
       - name: Loki
@@ -38,9 +51,11 @@ datasources:
         access: proxy
       - name: Tempo
         type: tempo
-        url: http://tempo.obs-shared.svc.cluster.local:3100
+        # FIXED: Changed port from 3100 to 3200
+        url: http://tempo.obs-shared.svc.cluster.local:3200
         access: proxy
       - name: Pyroscope
-        type: pyroscope
-        url: http://my-pyroscope.obs-shared.svc.cluster.local:4040
+        type: grafana-pyroscope-datasource
+        # FIXED: Removed 'my-'
+        url: http://pyroscope.obs-shared.svc.cluster.local:4040
         access: proxy
