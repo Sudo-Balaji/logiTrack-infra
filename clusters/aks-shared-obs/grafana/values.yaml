@@ -1,5 +1,10 @@
 # GRAFANA CONFIGURATION
 
+
+adminUser: admin
+adminPassword: "dummy" # This is a dummy value. The real password is injected securely via the CSI driver and read by Grafana at runtime.
+
+
 # 1. The Security Injection
 env:
   # Tell Grafana to read the new human-readable password from the CSI file!
