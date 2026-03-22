@@ -126,20 +126,20 @@ alloy:
       // ==========================================
   
       prometheus.remote_write "backend" {
-        endpoint { url = "http://10.0.86.50:80/api/v1/write" }
+      endpoint { url = "http://10.20.1.5:80/api/v1/write" }
       }
 
       loki.write "backend" {
-        endpoint { url = "http://10.0.224.67:80/loki/api/v1/push" }
+      endpoint { url = "http://10.20.1.6:80/loki/api/v1/push" }
       }
 
       otelcol.exporter.otlp "tempo" {
-        client {
-          endpoint = "http://10.0.190.172:4317"
-          tls { insecure = true }
-        }
+      client {
+        endpoint = "http://10.20.1.7:4317"
+        tls { insecure = true }
+      }
       }
 
       pyroscope.write "backend" {
-        endpoint { url = "http://10.0.28.161:4040" }
+      endpoint { url = "http://10.20.1.8:4040" }
       }
