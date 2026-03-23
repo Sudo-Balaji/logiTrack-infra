@@ -2,6 +2,13 @@
 
 # 1. Configure the Main Server
 server:
+  # --- AZURE ILB CONFIGURATION ---
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+  # -------------------------------
+
   # THE CRITICAL FIX: Unlock the door so Alloy can push metrics later
 
   # extraFlags: This is the most important part of the file. 
