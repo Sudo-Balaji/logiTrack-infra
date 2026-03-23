@@ -2,6 +2,13 @@
 # Render command to see the final YAML that will be applied to Kubernetes. This is useful for debugging and learning how Helm works.
 # helm template my-loki grafana/loki --namespace obs-shared -f clusters/aks-shared-obs/loki/values.yaml -f clusters/aks-shared-obs/loki/config.yaml > rendered-loki.yaml
 
+# --- AZURE ILB CONFIGURATION ---
+gateway:
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+# -------------------------------
 
 # 1. FIX: Zero out the default SimpleScalable components
 write:

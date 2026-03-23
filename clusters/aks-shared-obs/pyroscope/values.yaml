@@ -2,11 +2,12 @@
 
 # Render command: helm template my-pyroscope grafana/pyroscope --namespace obs-shared -f clusters/aks-shared-obs/pyroscope/values.yaml > rendered-pyroscope.yaml
 
+
 deploymentMode: SingleBinary
 
 all:
   replicas: 1
-  
+
   # The PVC (persistent volume for temporary data)
   persistentVolume:
     enabled: true
@@ -53,3 +54,11 @@ pyroscope:
           secretProviderClass: "azure-kv-bridge"
         nodePublishSecretRef:      
           name: kvcreds
+
+  # --- AZURE ILB CONFIGURATION ---
+  # THE FIX: It MUST go here, exactly under the 'pyroscope:' key.
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+  # -------------------------------

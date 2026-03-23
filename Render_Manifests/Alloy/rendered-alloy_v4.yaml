@@ -1,0 +1,419 @@
+---
+# Source: alloy/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+automountServiceAccountToken: true
+metadata:
+  name: alloy
+  namespace: logitrack-app
+  labels:
+    helm.sh/chart: alloy-1.6.2
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/instance: alloy
+    app.kubernetes.io/version: "v1.14.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: alloy
+    app.kubernetes.io/component: rbac
+---
+# Source: alloy/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy
+  namespace: logitrack-app
+  labels:
+    helm.sh/chart: alloy-1.6.2
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/instance: alloy
+    app.kubernetes.io/version: "v1.14.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: alloy
+    app.kubernetes.io/component: config
+data:
+  config.alloy: |-
+    logging {
+      level = "info"
+      format = "logfmt"
+    }
+    
+    // ==========================================
+    // 1. KUBERNETES DISCOVERY
+    // Find all pods on this local Azure node
+    // ==========================================
+    discovery.kubernetes "local_pods" {
+      role = "pod"
+      selectors {
+        role = "pod"
+        field = "spec.nodeName=" + sys.env("HOSTNAME")
+      }
+    }
+    
+    // ==========================================
+    // 2. METRICS PIPELINE (PULL)
+    // Look for the Prometheus annotations!
+    // ==========================================
+    discovery.relabel "metrics_targets" {
+      targets = discovery.kubernetes.local_pods.targets
+      rule {
+        action = "keep"
+        source_labels = ["__meta_kubernetes_pod_annotation_prometheus_io_scrape"]
+        regex = "true"
+      }
+      rule {
+        action = "replace"
+        source_labels = ["__meta_kubernetes_pod_annotation_prometheus_io_path"]
+        target_label = "__metrics_path__"
+      }
+      rule {
+        action = "replace"
+        source_labels = ["__address__", "__meta_kubernetes_pod_annotation_prometheus_io_port"]
+        separator = ":"
+        regex = "([^:]+)(?::\\d+)?;(\\d+)"
+        target_label = "__address__"
+        replacement = "$1:$2"
+      }
+    }
+    
+    prometheus.scrape "app_metrics" {
+      targets = discovery.relabel.metrics_targets.output
+      forward_to = [prometheus.remote_write.backend.receiver]
+    }
+    
+    // ==========================================
+    // 3. LOGS PIPELINE (PULL)
+    // Read the physical files mounted from the Host
+    // ==========================================
+    discovery.relabel "log_targets" {
+      targets = discovery.kubernetes.local_pods.targets
+      rule {
+        action = "replace"
+        source_labels = ["__meta_kubernetes_namespace"]
+        target_label = "namespace"
+      }
+      rule {
+        action = "replace"
+        source_labels = ["__meta_kubernetes_pod_label_app"]
+        target_label = "app"
+      }
+    }
+    
+    loki.source.kubernetes "app_logs" {
+      targets = discovery.relabel.log_targets.output
+      forward_to = [loki.write.backend.receiver]
+    }
+    
+    // ==========================================
+    // 4. TRACES & PROFILES PIPELINE (PUSH)
+    // Receive payloads from the Java Agents
+    // ==========================================
+    otelcol.receiver.otlp "default" {
+      grpc { endpoint = "0.0.0.0:4317" }
+      output {
+        traces = [otelcol.exporter.otlp.tempo.input]
+      }
+    }
+    
+    pyroscope.receive_http "default" {
+      http { 
+        listen_address = "0.0.0.0"
+        listen_port = 4040 
+      }
+      forward_to = [pyroscope.write.backend.receiver]
+    }
+    
+    // ==========================================
+    // 5. EGRESS / REMOTE WRITE (VALK-404)
+    // Ship everything to the obs-shared cluster
+    // ==========================================
+    
+    prometheus.remote_write "backend" {
+    endpoint { url = "http://10.20.1.5:80/api/v1/write" }
+    }
+    
+    loki.write "backend" {
+    endpoint { url = "http://10.20.1.6:80/loki/api/v1/push" }
+    }
+    
+    otelcol.exporter.otlp "tempo" {
+    client {
+      endpoint = "http://10.20.1.7:4317"
+      tls { insecure = true }
+    }
+    }
+    
+    pyroscope.write "backend" {
+    endpoint { url = "http://10.20.1.8:4040" }
+    }
+---
+# Source: alloy/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: alloy
+  labels:
+    helm.sh/chart: alloy-1.6.2
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/instance: alloy
+    app.kubernetes.io/version: "v1.14.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: alloy
+    app.kubernetes.io/component: rbac
+rules:
+  - apiGroups:
+    - ""
+    - discovery.k8s.io
+    - networking.k8s.io
+    resources:
+    - endpoints
+    - endpointslices
+    - ingresses
+    - pods
+    - services
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - pods
+    - pods/log
+    - namespaces
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - monitoring.grafana.com
+    resources:
+    - podlogs
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - monitoring.coreos.com
+    resources:
+    - prometheusrules
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - monitoring.coreos.com
+    resources:
+    - alertmanagerconfigs
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - monitoring.coreos.com
+    resources:
+    - podmonitors
+    - servicemonitors
+    - probes
+    - scrapeconfigs
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    - secrets
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - apps
+    - extensions
+    resources:
+    - replicasets
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - nodes
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - nodes/pods
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - nodes/metrics
+    verbs:
+    - get
+    - list
+    - watch
+  - nonResourceURLs:
+    - /metrics
+    verbs:
+    - get
+---
+# Source: alloy/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: alloy
+  labels:
+    helm.sh/chart: alloy-1.6.2
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/instance: alloy
+    app.kubernetes.io/version: "v1.14.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: alloy
+    app.kubernetes.io/component: rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: alloy
+subjects:
+  - kind: ServiceAccount
+    name: alloy
+    namespace: logitrack-app
+---
+# Source: alloy/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: alloy
+  namespace: logitrack-app
+  labels:
+    helm.sh/chart: alloy-1.6.2
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/instance: alloy
+    app.kubernetes.io/version: "v1.14.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: alloy
+    app.kubernetes.io/component: networking
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/instance: alloy
+  internalTrafficPolicy: Cluster
+  ports:
+    - name: http-metrics
+      port: 12345
+      targetPort: 12345
+      protocol: "TCP"
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+    - name: pyroscope
+      port: 4040
+      targetPort: 4040
+      protocol: TCP
+---
+# Source: alloy/templates/controllers/daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: alloy
+  namespace: logitrack-app
+  labels:
+    helm.sh/chart: alloy-1.6.2
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/instance: alloy
+    app.kubernetes.io/version: "v1.14.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: alloy
+spec:
+  minReadySeconds: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alloy
+      app.kubernetes.io/instance: alloy
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: alloy
+      labels:
+        app.kubernetes.io/name: alloy
+        app.kubernetes.io/instance: alloy
+    spec:
+      serviceAccountName: alloy
+      containers:
+        - name: alloy
+          image: docker.io/grafana/alloy:v1.14.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - run
+            - /etc/alloy/config.alloy
+            - --storage.path=/tmp/alloy
+            - --server.http.listen-addr=0.0.0.0:12345
+            - --server.http.ui-path-prefix=/
+            - --stability.level=generally-available
+          env:
+            - name: ALLOY_DEPLOY_MODE
+              value: "helm"
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          ports:
+            - containerPort: 12345
+              name: http-metrics
+            - containerPort: 4317
+              name: otlp-grpc
+              protocol: TCP
+            - containerPort: 4040
+              name: pyroscope
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 12345
+              scheme: HTTP
+            initialDelaySeconds: 10
+            timeoutSeconds: 1
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alloy
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+        - name: config-reloader
+          image: quay.io/prometheus-operator/prometheus-config-reloader:v0.81.0
+          args:
+            - --watched-dir=/etc/alloy
+            - --reload-url=http://localhost:12345/-/reload
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alloy
+          resources:
+            requests:
+              cpu: 10m
+              memory: 50Mi
+      dnsPolicy: ClusterFirst
+      volumes:
+        - name: config
+          configMap:
+            name: alloy
+        - name: varlog
+          hostPath:
+            path: /var/log

@@ -2,6 +2,13 @@
 
 # Rendered command := helm template my-tempo grafana/tempo --namespace obs-shared -f clusters/aks-shared-obs/tempo/values.yaml -f clusters/aks-shared-obs/tempo/config.yaml > rendered-tempo.yaml
 
+# --- AZURE ILB CONFIGURATION ---
+service:
+  type: LoadBalancer
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+# -------------------------------
+
 # 1. Mount the exact same CSI Bridge we built for Loki
 
 # extraVolumes / extraVolumeMounts: We are telling Kubernetes, "Hey, attach the azure-kv-bridge to this Tempo pod." 
